@@ -154,6 +154,9 @@ function adminCard(){
     <label>Kategori<input id="fnCat" list="cats"><datalist id="cats">${cats}</datalist></label>
     <label>Harga dalam rupiah (0 = tidak dijual otomatis)<input id="fnPrice" type="number" min="0" step="500" value="0"></label>
     <button data-a="addFolder">Tambah folder</button></div>
+  <div class="card"><h3>Hapus folder mod</h3>
+    <label>Folder yang dihapus<select id="dfFolder">${opts}</select></label>
+    <button class="ghost" style="color:var(--bad);border-color:var(--bad)" data-a="delFolder">Hapus folder</button></div>
   <div class="card"><h3>Atur harga folder</h3>
     <label>Folder<select id="prFolder">${opts}</select></label>
     <label>Harga dalam rupiah<input id="prVal" type="number" min="0" step="500"></label>
@@ -260,6 +263,13 @@ document.addEventListener('click', async e => {
     const r = await db.from('folders').update({price}).eq('id', $('#prFolder').value);
     if (r.error) return note(r.error.message, true);
     note('Harga disimpan.'); refresh();
+  } else if (a === 'delFolder'){
+    const sel = $('#dfFolder'), name = sel.options[sel.selectedIndex].text;
+    if (!confirm('Hapus folder "' + name + '"?\n\nSemua link, token, dan akses pembeli untuk folder ini ikut terhapus. Tidak bisa dibatalkan.')) return;
+    const r = await db.from('folders').delete().eq('id', sel.value);
+    if (r.error) return note(r.error.message, true);
+    if (state.open && state.open.id === sel.value) state.open = null;
+    note('Folder dihapus.'); refresh();
   } else if (a === 'delLink'){
     const r = await db.from('folder_links').delete().eq('id', b.dataset.id);
     if (r.error) return note(r.error.message, true);
