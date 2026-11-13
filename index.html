@@ -1,0 +1,304 @@
+<!doctype html>
+<html lang="id">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="color-scheme" content="dark">
+<title>ZyanPrtmna – Mod ETS2</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@600;700&family=Inter:wght@400;500;600&display=swap">
+<style>
+:root{--bg:#0F1215;--panel:#171C22;--line:#28313B;--amber:#FFB400;--text:#F1F3F5;--muted:#9AA3AE;--ok:#46C37B;--bad:#FF7A6E}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--text);font:16px/1.5 Inter,system-ui,sans-serif}
+.stripe{height:10px;background:repeating-linear-gradient(45deg,var(--amber) 0 18px,#111418 18px 36px)}
+.wrap{max-width:820px;margin:0 auto;padding:20px 16px 80px}
+.top{display:flex;justify-content:space-between;align-items:flex-start;gap:12px;margin-bottom:20px}
+.brand{font:700 44px/1 'Barlow Condensed',sans-serif;letter-spacing:.01em}
+.brand::after{content:'';display:block;width:56px;height:5px;background:var(--amber);margin-top:6px}
+.sub{color:var(--muted);margin-top:8px}
+#who{text-align:right;font-size:14px;color:var(--muted)}
+.mail{display:block;margin-bottom:6px;word-break:break-all}
+h2{font:700 28px/1.1 'Barlow Condensed',sans-serif;margin:0 0 12px}
+h3{font:600 20px/1.2 'Barlow Condensed',sans-serif;margin:0 0 10px;color:var(--amber)}
+.muted{color:var(--muted)}
+.card{background:var(--panel);border:1px solid var(--line);border-left:5px solid var(--amber);border-radius:10px;padding:18px;margin-bottom:16px}
+.grp{margin:28px 0}
+.row{display:flex;align-items:center;gap:10px;flex-wrap:wrap;padding:12px 0;border-bottom:1px solid var(--line)}
+.nm{flex:1 1 200px;font-weight:500;min-width:0;word-break:break-word}
+.st{font-size:14px;color:var(--muted);min-width:96px}
+.st.ok{color:var(--ok)}
+label{display:block;margin:0 0 12px;font-size:14px;color:var(--muted)}
+input,select{display:block;width:100%;margin-top:4px;min-height:44px;padding:8px 12px;border-radius:8px;border:1px solid var(--line);background:#0F1215;color:var(--text);font:inherit}
+button{min-height:44px;padding:8px 18px;border-radius:8px;border:0;background:var(--amber);color:#111418;font:600 15px Inter,sans-serif;cursor:pointer}
+button.ghost{background:transparent;color:var(--text);border:1px solid #3a4553}
+button:hover{filter:brightness(1.1)}
+:focus-visible{outline:3px solid #fff;outline-offset:2px}
+.btns{display:flex;gap:10px;flex-wrap:wrap}
+.between{display:flex;justify-content:space-between;align-items:center;gap:10px}
+.dl{display:block;padding:14px 16px;margin:8px 0;border:1px solid var(--line);border-radius:8px;color:var(--text);text-decoration:none;font-weight:600;word-break:break-word}
+.dl:hover{border-color:var(--amber);color:var(--amber)}
+.code{font:700 30px 'Barlow Condensed',sans-serif;letter-spacing:.08em;margin:12px 0 8px;color:var(--amber)}
+#msg{min-height:24px;margin-bottom:8px;color:var(--ok)}
+#msg.bad,.bad{color:var(--bad)}
+dialog{background:var(--panel);color:var(--text);border:1px solid var(--line);border-radius:12px;padding:22px;width:min(420px,92vw)}
+dialog::backdrop{background:rgba(0,0,0,.7)}
+small{font-size:13px}
+@media (prefers-reduced-motion:reduce){*{transition:none!important}}
+</style>
+</head>
+<body>
+<div class="stripe"></div>
+<div class="wrap">
+  <header class="top">
+    <div><div class="brand">ZyanPrtmna</div><div class="sub">Mod Euro Truck Simulator 2</div></div>
+    <div id="who"></div>
+  </header>
+  <div id="msg" role="status" aria-live="polite"></div>
+  <main id="app"><p class="muted">Memuat daftar mod…</p></main>
+</div>
+
+<dialog id="dlg">
+  <form id="dlgForm">
+    <h2>Masukkan token</h2>
+    <p class="muted" id="dlgFor"></p>
+    <label>Token dari penjual
+      <input id="tkIn" autocomplete="off" autocapitalize="characters" spellcheck="false" placeholder="XXXX-XXXX-XXXX">
+    </label>
+    <div id="dlgErr" class="bad" role="alert"></div>
+    <div class="btns"><button type="submit">Buka folder</button><button type="button" class="ghost" data-a="dlgClose">Batal</button></div>
+  </form>
+</dialog>
+
+<dialog id="buyDlg">
+  <form id="buyForm">
+    <h2>Beli folder</h2>
+    <p class="muted" id="buyFor"></p>
+    <label>Metode pembayaran
+      <select id="payMethod"></select>
+    </label>
+    <div id="buyErr" class="bad" role="alert"></div>
+    <div class="btns"><button type="submit" id="buyGo">Bayar sekarang</button><button type="button" class="ghost" data-a="buyClose">Batal</button></div>
+  </form>
+</dialog>
+
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.45.4/dist/umd/supabase.min.js"></script>
+<script>
+/* ISI DUA BARIS INI (Supabase → Project Settings → API). Anon key memang boleh publik. */
+const SUPABASE_URL = 'https://zmcbmzdzokpmmgygbhcx.supabase.co';
+const SUPABASE_ANON_KEY = 'sb_publishable_iq142nXqRULTT3NNdx8_6w_xS_QlKe5';
+
+const db = supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+const $ = s => document.querySelector(s);
+const esc = s => String(s ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+const safe = u => /^https?:\/\//i.test(u);
+const rp = n => 'Rp ' + Number(n).toLocaleString('id-ID');
+async function fnErr(err){ try{ const j = await err.context.json(); return j.error || err.message; }catch(_){ return err.message; } }
+const state = {user:null, admin:false, folders:[], owned:new Set(), open:null};
+const buy = {folder:null};
+
+function note(t, bad){ const m = $('#msg'); m.textContent = t || ''; m.className = bad ? 'bad' : ''; }
+
+async function refresh(){
+  const {data:{session}} = await db.auth.getSession();
+  state.user = session ? session.user : null;
+  const f = await db.from('folders').select('id,name,category,sort,price').order('sort');
+  if (f.error){ note('Gagal memuat daftar mod: ' + f.error.message, true); return; }
+  state.folders = f.data;
+  state.owned = new Set(); state.admin = false;
+  if (state.user){
+    const e = await db.from('entitlements').select('folder_id').eq('user_id', state.user.id);
+    (e.data || []).forEach(r => state.owned.add(r.folder_id));
+    const a = await db.rpc('is_admin'); state.admin = a.data === true;
+  } else state.open = null;
+  render();
+  if (state.admin){ loadTokens(); loadLinks(); }
+}
+
+function authCard(){
+  return `<section class="card"><h2>Masuk untuk membuka folder mod</h2>
+  <p class="muted">Token terikat ke akunmu. Folder yang sudah dibuka tetap bisa diakses kapan saja, dan orang lain tidak bisa memakai token yang sama.</p>
+  <label>Email<input id="em" type="email" autocomplete="email"></label>
+  <label>Kata sandi (minimal 6 karakter)<input id="pw" type="password" autocomplete="current-password" minlength="6"></label>
+  <div class="btns"><button data-a="login">Masuk</button><button class="ghost" data-a="signup">Daftar akun baru</button></div></section>`;
+}
+function folderCard(){
+  const o = state.open;
+  const links = o.links.filter(l => safe(l.url));
+  return `<section class="card"><div class="between"><h2>${esc(o.name)}</h2><button class="ghost" data-a="close">Tutup</button></div>` +
+    (links.length ? links.map(l => `<a class="dl" href="${esc(l.url)}" target="_blank" rel="noopener noreferrer">${esc(l.label)}</a>`).join('')
+                  : '<p class="muted">Link download folder ini belum diisi. Hubungi penjual.</p>') + '</section>';
+}
+function catalog(){
+  const g = {}; state.folders.forEach(f => (g[f.category] = g[f.category] || []).push(f));
+  return Object.entries(g).map(([c, list]) => `<section class="grp"><h2>${esc(c)}</h2>` + list.map(f => {
+    const own = state.owned.has(f.id) || state.admin;
+    return `<div class="row"><span class="nm">${esc(f.name)}</span>` + (own
+      ? `<span class="st ok">Terbuka</span><button data-a="open" data-id="${f.id}">Buka folder</button>`
+      : `<span class="st">${f.price > 0 ? rp(f.price) : 'Terkunci'}</span>`
+        + (f.price > 0 ? `<button data-a="buy" data-id="${f.id}" data-name="${esc(f.name)}" data-price="${f.price}">Beli</button>` : '')
+        + `<button class="ghost" data-a="unlock" data-id="${f.id}" data-name="${esc(f.name)}">Punya token</button>`) + '</div>';
+  }).join('') + '</section>').join('');
+}
+function adminCard(){
+  const opts = state.folders.map(f => `<option value="${f.id}">${esc(f.category)} · ${esc(f.name)}</option>`).join('');
+  const cats = [...new Set(state.folders.map(f => f.category))].map(c => `<option value="${esc(c)}">`).join('');
+  return `<section class="grp"><h2>Panel admin</h2>
+  <div class="card"><h3>Buat token baru</h3>
+    <label>Folder<select id="tkFolder">${opts}</select></label>
+    <label>Catatan, misalnya nama pembeli (opsional)<input id="tkNote"></label>
+    <button data-a="mk">Buat token</button><div id="tkOut"></div></div>
+  <div class="card"><h3>Token yang sudah dibuat</h3><div id="tkList" class="muted">Memuat…</div></div>
+  <div class="card"><h3>Tambah folder mod</h3>
+    <label>Nama mod<input id="fnName"></label>
+    <label>Kategori<input id="fnCat" list="cats"><datalist id="cats">${cats}</datalist></label>
+    <label>Harga dalam rupiah (0 = tidak dijual otomatis)<input id="fnPrice" type="number" min="0" step="500" value="0"></label>
+    <button data-a="addFolder">Tambah folder</button></div>
+  <div class="card"><h3>Atur harga folder</h3>
+    <label>Folder<select id="prFolder">${opts}</select></label>
+    <label>Harga dalam rupiah<input id="prVal" type="number" min="0" step="500"></label>
+    <button data-a="setPrice">Simpan harga</button></div>
+  <div class="card"><h3>Link download</h3>
+    <label>Folder<select id="lkFolder" data-change="links">${opts}</select></label>
+    <div id="lkList" class="muted">Memuat…</div>
+    <label>Nama link, misalnya “File utama”<input id="lkLabel"></label>
+    <label>URL (https://…)<input id="lkUrl" type="url"></label>
+    <button data-a="addLink">Tambah link</button></div></section>`;
+}
+function render(){
+  $('#who').innerHTML = state.user ? `<span class="mail">${esc(state.user.email)}</span><button class="ghost" data-a="logout">Keluar</button>` : '';
+  let h = '';
+  if (!state.user) h += authCard();
+  if (state.open) h += folderCard();
+  h += catalog();
+  if (state.admin) h += adminCard();
+  $('#app').innerHTML = h;
+}
+
+async function openFolder(id){
+  const r = await db.from('folder_links').select('id,label,url').eq('folder_id', id).order('label');
+  if (r.error) return note(r.error.message, true);
+  const f = state.folders.find(x => x.id === id);
+  state.open = {id, name: f ? f.name : 'Folder', links: r.data};
+  note(''); render(); window.scrollTo({top:0});
+}
+
+async function loadTokens(){
+  const el = $('#tkList'); if (!el) return;
+  const r = await db.from('tokens').select('code,note,redeemed_by,folder_id,created_at,folders(name)').order('created_at',{ascending:false}).limit(100);
+  if (r.error){ el.textContent = r.error.message; return; }
+  el.innerHTML = r.data.length ? r.data.map(t => `<div class="row"><span class="nm"><b>${esc(t.code)}</b><br><small class="muted">${esc(t.folders && t.folders.name)}${t.note ? ' · ' + esc(t.note) : ''}</small></span>
+    <span class="st ${t.redeemed_by ? 'ok' : ''}">${t.redeemed_by ? 'Sudah dipakai' : 'Belum dipakai'}</span>
+    <button class="ghost" data-a="rev" data-code="${esc(t.code)}" data-user="${t.redeemed_by || ''}" data-folder="${t.folder_id}">${t.redeemed_by ? 'Cabut akses' : 'Hapus'}</button></div>`).join('')
+    : 'Belum ada token.';
+}
+async function loadLinks(){
+  const el = $('#lkList'), sel = $('#lkFolder'); if (!el || !sel) return;
+  const r = await db.from('folder_links').select('id,label,url').eq('folder_id', sel.value).order('label');
+  if (r.error){ el.textContent = r.error.message; return; }
+  el.innerHTML = r.data.length ? r.data.map(l => `<div class="row"><span class="nm">${esc(l.label)}<br><small class="muted">${esc(l.url)}</small></span><button class="ghost" data-a="delLink" data-id="${l.id}">Hapus</button></div>`).join('') : 'Belum ada link di folder ini.';
+}
+
+document.addEventListener('change', e => { if (e.target.dataset.change === 'links') loadLinks(); });
+
+document.addEventListener('click', async e => {
+  const b = e.target.closest('[data-a]'); if (!b) return;
+  const a = b.dataset.a;
+  if (a === 'login' || a === 'signup'){
+    const email = $('#em').value.trim(), password = $('#pw').value;
+    if (!email || password.length < 6) return note('Isi email dan kata sandi (minimal 6 karakter).', true);
+    const r = a === 'login' ? await db.auth.signInWithPassword({email, password}) : await db.auth.signUp({email, password});
+    if (r.error) return note(r.error.message, true);
+    if (a === 'signup' && !r.data.session) return note('Akun dibuat. Cek email untuk konfirmasi, lalu masuk.');
+    note(''); refresh();
+  } else if (a === 'logout'){ await db.auth.signOut(); state.open = null; refresh(); }
+  else if (a === 'unlock'){
+    if (!state.user){ window.scrollTo({top:0}); return note('Masuk dulu, lalu masukkan token.', true); }
+    $('#dlgFor').textContent = 'Folder: ' + b.dataset.name; $('#tkIn').value = ''; $('#dlgErr').textContent = ''; $('#dlg').showModal();
+  } else if (a === 'dlgClose'){ $('#dlg').close(); }
+  else if (a === 'open'){ openFolder(b.dataset.id); }
+  else if (a === 'close'){ state.open = null; render(); if (state.admin){ loadTokens(); loadLinks(); } }
+  else if (a === 'mk'){
+    const r = await db.rpc('create_token', {p_folder: $('#tkFolder').value, p_note: $('#tkNote').value || null});
+    if (r.error) return note(r.error.message, true);
+    $('#tkOut').innerHTML = `<div class="code">${esc(r.data)}</div><button class="ghost" data-a="copy" data-t="${esc(r.data)}">Salin token</button>`;
+    $('#tkNote').value = ''; loadTokens();
+  } else if (a === 'copy'){ try{ await navigator.clipboard.writeText(b.dataset.t); note('Token disalin.'); }catch(_){ note('Salin manual token di layar.', true); } }
+  else if (a === 'rev'){
+    if (!confirm(b.dataset.user ? 'Cabut akses pembeli ini ke folder tersebut?' : 'Hapus token ini?')) return;
+    if (b.dataset.user) await db.from('entitlements').delete().eq('user_id', b.dataset.user).eq('folder_id', b.dataset.folder);
+    const r = await db.from('tokens').delete().eq('code', b.dataset.code);
+    if (r.error) return note(r.error.message, true);
+    loadTokens();
+  } else if (a === 'addFolder'){
+    const name = $('#fnName').value.trim(), category = $('#fnCat').value.trim();
+    if (!name || !category) return note('Isi nama mod dan kategori.', true);
+    const sort = state.folders.reduce((m, f) => Math.max(m, f.sort), 0) + 1;
+    const price = Math.max(0, parseInt($('#fnPrice').value, 10) || 0);
+    const r = await db.from('folders').insert({name, category, sort, price});
+    if (r.error) return note(r.error.message, true);
+    note('Folder ditambahkan.'); refresh();
+  } else if (a === 'addLink'){
+    const label = $('#lkLabel').value.trim(), url = $('#lkUrl').value.trim();
+    if (!label || !safe(url)) return note('Isi nama link dan URL yang diawali https://', true);
+    const r = await db.from('folder_links').insert({folder_id: $('#lkFolder').value, label, url});
+    if (r.error) return note(r.error.message, true);
+    $('#lkLabel').value = ''; $('#lkUrl').value = ''; note('Link ditambahkan.'); loadLinks();
+  } else if (a === 'buy'){
+    if (!state.user){ window.scrollTo({top:0}); return note('Masuk dulu, lalu pilih Beli.', true); }
+    buy.folder = b.dataset.id;
+    $('#buyFor').textContent = b.dataset.name + ' · ' + rp(b.dataset.price);
+    $('#buyErr').textContent = ''; $('#buyGo').disabled = false;
+    const sel = $('#payMethod'); sel.innerHTML = '<option>Memuat metode pembayaran…</option>';
+    $('#buyDlg').showModal();
+    const r = await db.functions.invoke('list-channels');
+    if (r.error){ $('#buyErr').textContent = await fnErr(r.error); return; }
+    sel.innerHTML = r.data.channels.map(c => `<option value="${esc(c.code)}">${esc(c.name)}</option>`).join('');
+  } else if (a === 'buyClose'){ $('#buyDlg').close(); }
+  else if (a === 'setPrice'){
+    const price = Math.max(0, parseInt($('#prVal').value, 10) || 0);
+    const r = await db.from('folders').update({price}).eq('id', $('#prFolder').value);
+    if (r.error) return note(r.error.message, true);
+    note('Harga disimpan.'); refresh();
+  } else if (a === 'delLink'){
+    const r = await db.from('folder_links').delete().eq('id', b.dataset.id);
+    if (r.error) return note(r.error.message, true);
+    loadLinks();
+  }
+});
+
+$('#dlgForm').addEventListener('submit', async e => {
+  e.preventDefault();
+  const code = $('#tkIn').value.trim();
+  if (!code) return;
+  const r = await db.rpc('redeem_token', {p_code: code});
+  if (r.error) { $('#dlgErr').textContent = r.error.message; return; }
+  if (!r.data.ok) { $('#dlgErr').textContent = r.data.error; return; }
+  state.owned.add(r.data.folder_id);
+  $('#dlg').close();
+  openFolder(r.data.folder_id);
+});
+
+$('#buyForm').addEventListener('submit', async e => {
+  e.preventDefault();
+  const btn = $('#buyGo'); btn.disabled = true; $('#buyErr').textContent = '';
+  const r = await db.functions.invoke('create-payment', {body: {folder_id: buy.folder, method: $('#payMethod').value}});
+  if (r.error || !r.data || !r.data.checkout_url){
+    $('#buyErr').textContent = r.error ? await fnErr(r.error) : 'Gagal membuat pembayaran.';
+    btn.disabled = false; return;
+  }
+  window.location.href = r.data.checkout_url;
+});
+
+/* Kembali dari halaman pembayaran: cek tiap beberapa detik sampai folder terbuka otomatis. */
+if (new URLSearchParams(location.search).get('bayar')){
+  let n = 0;
+  const t = setInterval(() => { refresh(); if (++n >= 24) clearInterval(t); }, 5000);
+  setTimeout(() => note('Pembayaran dicek otomatis. Folder terbuka sendiri setelah pembayaranmu terkonfirmasi.'), 800);
+}
+
+db.auth.onAuthStateChange(() => { refresh(); });
+refresh();
+</script>
+</body>
+</html>
