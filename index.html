@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <meta name="color-scheme" content="dark">
-<title>ZyanPrtmna – Mod ETS2</title>
+<title>SALE MOD ETS2</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@600;700&family=Inter:wght@400;500;600&display=swap">
 <style>
@@ -38,6 +38,7 @@ button:hover{filter:brightness(1.1)}
 .between{display:flex;justify-content:space-between;align-items:center;gap:10px}
 .dl{display:block;padding:14px 16px;margin:8px 0;border:1px solid var(--line);border-radius:8px;color:var(--text);text-decoration:none;font-weight:600;word-break:break-word}
 .dl:hover{border-color:var(--amber);color:var(--amber)}
+img.qr{display:block;width:100%;max-width:320px;margin:12px auto;border-radius:10px;background:#fff}
 .code{font:700 30px 'Barlow Condensed',sans-serif;letter-spacing:.08em;margin:12px 0 8px;color:var(--amber)}
 #msg{min-height:24px;margin-bottom:8px;color:var(--ok)}
 #msg.bad,.bad{color:var(--bad)}
@@ -51,7 +52,7 @@ small{font-size:13px}
 <div class="stripe"></div>
 <div class="wrap">
   <header class="top">
-    <div><div class="brand">ZyanPrtmna</div><div class="sub">Mod Euro Truck Simulator 2</div></div>
+    <div><div class="brand">SALE MOD ETS2</div><div class="sub">Mod Euro Truck Simulator 2</div></div>
     <div id="who"></div>
   </header>
   <div id="msg" role="status" aria-live="polite"></div>
@@ -70,17 +71,7 @@ small{font-size:13px}
   </form>
 </dialog>
 
-<dialog id="buyDlg">
-  <form id="buyForm">
-    <h2>Beli folder</h2>
-    <p class="muted" id="buyFor"></p>
-    <label>Metode pembayaran
-      <select id="payMethod"></select>
-    </label>
-    <div id="buyErr" class="bad" role="alert"></div>
-    <div class="btns"><button type="submit" id="buyGo">Bayar sekarang</button><button type="button" class="ghost" data-a="buyClose">Batal</button></div>
-  </form>
-</dialog>
+<dialog id="buyDlg"><div id="buyBody"></div></dialog>
 
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.45.4/dist/umd/supabase.min.js"></script>
 <script>
@@ -95,7 +86,7 @@ const safe = u => /^https?:\/\//i.test(u);
 const rp = n => 'Rp ' + Number(n).toLocaleString('id-ID');
 async function fnErr(err){ try{ const j = await err.context.json(); return j.error || err.message; }catch(_){ return err.message; } }
 const state = {user:null, admin:false, folders:[], owned:new Set(), open:null};
-const buy = {folder:null};
+const buy = {order:null, timer:null};
 
 function note(t, bad){ const m = $('#msg'); m.textContent = t || ''; m.className = bad ? 'bad' : ''; }
 
@@ -112,7 +103,7 @@ async function refresh(){
     const a = await db.rpc('is_admin'); state.admin = a.data === true;
   } else state.open = null;
   render();
-  if (state.admin){ loadTokens(); loadLinks(); }
+  if (state.admin){ loadTokens(); loadLinks(); loadOrders(); }
 }
 
 function authCard(){
@@ -202,6 +193,27 @@ async function loadLinks(){
   el.innerHTML = r.data.length ? r.data.map(l => `<div class="row"><span class="nm">${esc(l.label)}<br><small class="muted">${esc(l.url)}</small></span><button class="ghost" data-a="delLink" data-id="${l.id}">Hapus</button></div>`).join('') : 'Belum ada link di folder ini.';
 }
 
+function renderBuy(){
+  const o = buy.order;
+  $('#buyBody').innerHTML = o.status === 'CLAIMED'
+    ? `<h2>Menunggu konfirmasi</h2><p>Pembayaran <b>${rp(o.amount)}</b> untuk <b>${esc(o.name)}</b> sedang dicek penjual. Folder terbuka otomatis setelah dikonfirmasi, biasanya dalam beberapa menit. Biarkan halaman ini tetap terbuka.</p><div class="btns"><button class="ghost" data-a="buyClose">Tutup</button></div>`
+    : `<h2>Bayar folder</h2><p class="muted">${esc(o.name)}</p><div class="code">${rp(o.amount)}</div><p>Scan QRIS di bawah, lalu bayar <b>tepat sebesar nominal di atas</b>, termasuk angka belakangnya. Nominal yang berbeda tidak bisa diproses.</p><img class="qr" src="qris.jpg" onerror="this.onerror=null;this.src='qris.png'" alt="QRIS pembayaran"><div id="buyErr" class="bad" role="alert"></div><div class="btns"><button data-a="claim">Saya sudah bayar</button><button class="ghost" data-a="buyClose">Batal</button></div>`;
+}
+function startPoll(){
+  stopPoll();
+  buy.timer = setInterval(async () => {
+    await refresh();
+    if (buy.order && state.owned.has(buy.order.folder)){ const id = buy.order.folder; stopPoll(); $('#buyDlg').close(); openFolder(id); }
+  }, 5000);
+}
+function stopPoll(){ if (buy.timer){ clearInterval(buy.timer); buy.timer = null; } }
+async function loadOrders(){
+  const el = $('#odList'); if (!el) return;
+  const r = await db.rpc('admin_orders');
+  if (r.error){ el.textContent = r.error.message; return; }
+  el.innerHTML = r.data.length ? r.data.map(o => `<div class="row"><span class="nm"><b>${rp(o.amount)}</b> · ${esc(o.folder)}<br><small class="muted">${esc(o.email)} · ${o.status === 'CLAIMED' ? 'sudah klik “sudah bayar”' : 'belum klik bayar'}</small></span><button data-a="okOrder" data-id="${o.id}">Konfirmasi</button><button class="ghost" data-a="noOrder" data-id="${o.id}">Tolak</button></div>`).join('') : 'Tidak ada pesanan yang menunggu.';
+}
+
 document.addEventListener('change', e => { if (e.target.dataset.change === 'links') loadLinks(); });
 
 document.addEventListener('click', async e => {
@@ -220,7 +232,7 @@ document.addEventListener('click', async e => {
     $('#dlgFor').textContent = 'Folder: ' + b.dataset.name; $('#tkIn').value = ''; $('#dlgErr').textContent = ''; $('#dlg').showModal();
   } else if (a === 'dlgClose'){ $('#dlg').close(); }
   else if (a === 'open'){ openFolder(b.dataset.id); }
-  else if (a === 'close'){ state.open = null; render(); if (state.admin){ loadTokens(); loadLinks(); } }
+  else if (a === 'close'){ state.open = null; render(); if (state.admin){ loadTokens(); loadLinks(); loadOrders(); } }
   else if (a === 'mk'){
     const r = await db.rpc('create_token', {p_folder: $('#tkFolder').value, p_note: $('#tkNote').value || null});
     if (r.error) return note(r.error.message, true);
@@ -249,15 +261,31 @@ document.addEventListener('click', async e => {
     $('#lkLabel').value = ''; $('#lkUrl').value = ''; note('Link ditambahkan.'); loadLinks();
   } else if (a === 'buy'){
     if (!state.user){ window.scrollTo({top:0}); return note('Masuk dulu, lalu pilih Beli.', true); }
-    buy.folder = b.dataset.id;
-    $('#buyFor').textContent = b.dataset.name + ' · ' + rp(b.dataset.price);
-    $('#buyErr').textContent = ''; $('#buyGo').disabled = false;
-    const sel = $('#payMethod'); sel.innerHTML = '<option>Memuat metode pembayaran…</option>';
-    $('#buyDlg').showModal();
-    const r = await db.functions.invoke('list-channels');
-    if (r.error){ $('#buyErr').textContent = await fnErr(r.error); return; }
-    sel.innerHTML = r.data.channels.map(c => `<option value="${esc(c.code)}">${esc(c.name)}</option>`).join('');
-  } else if (a === 'buyClose'){ $('#buyDlg').close(); }
+    const r = await db.rpc('create_manual_order', {p_folder: b.dataset.id});
+    if (r.error) return note(r.error.message, true);
+    if (!r.data.ok) return note(r.data.error, true);
+    buy.order = {id: r.data.order_id, amount: r.data.amount, status: r.data.status, folder: b.dataset.id, name: b.dataset.name};
+    renderBuy(); $('#buyDlg').showModal(); startPoll();
+  }
+  else if (a === 'claim'){
+    const r = await db.rpc('claim_order', {p_order: buy.order.id});
+    if (r.error || !r.data.ok){ $('#buyErr').textContent = r.error ? r.error.message : r.data.error; return; }
+    buy.order.status = 'CLAIMED'; renderBuy();
+  }
+  else if (a === 'buyClose'){ stopPoll(); $('#buyDlg').close(); }
+  else if (a === 'okOrder'){
+    if (!confirm('Kamu sudah cek uang masuk sesuai nominal ini? Folder langsung dibuka untuk pembeli.')) return;
+    const r = await db.rpc('confirm_order', {p_order: b.dataset.id});
+    if (r.error || !r.data.ok) return note(r.error ? r.error.message : r.data.error, true);
+    note('Pesanan dikonfirmasi, folder terbuka untuk pembeli.'); loadOrders();
+  }
+  else if (a === 'noOrder'){
+    if (!confirm('Tolak pesanan ini?')) return;
+    const r = await db.rpc('reject_order', {p_order: b.dataset.id});
+    if (r.error) return note(r.error.message, true);
+    loadOrders();
+  }
+  else if (a === 'reloadOrders'){ loadOrders(); }
   else if (a === 'setPrice'){
     const price = Math.max(0, parseInt($('#prVal').value, 10) || 0);
     const r = await db.from('folders').update({price}).eq('id', $('#prFolder').value);
@@ -287,17 +315,6 @@ $('#dlgForm').addEventListener('submit', async e => {
   state.owned.add(r.data.folder_id);
   $('#dlg').close();
   openFolder(r.data.folder_id);
-});
-
-$('#buyForm').addEventListener('submit', async e => {
-  e.preventDefault();
-  const btn = $('#buyGo'); btn.disabled = true; $('#buyErr').textContent = '';
-  const r = await db.functions.invoke('create-payment', {body: {folder_id: buy.folder, method: $('#payMethod').value}});
-  if (r.error || !r.data || !r.data.checkout_url){
-    $('#buyErr').textContent = r.error ? await fnErr(r.error) : 'Gagal membuat pembayaran.';
-    btn.disabled = false; return;
-  }
-  window.location.href = r.data.checkout_url;
 });
 
 /* Kembali dari halaman pembayaran: cek tiap beberapa detik sampai folder terbuka otomatis. */
